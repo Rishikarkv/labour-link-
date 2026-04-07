@@ -44,7 +44,8 @@ interface Application {
 }
 
 export default function Dashboard() {
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; avatar_url?: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [works, setWorks] = useState<Work[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -107,6 +108,42 @@ export default function Dashboard() {
       setIsApplying(null);
     }
   };
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // 1. Upload to Cloudinary
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadRes.ok) throw new Error('Upload failed');
+      const { url } = await uploadRes.json();
+
+      // 2. Update Supabase Profile
+      const updateRes = await fetch('/api/labourlink/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: url }),
+      });
+
+      if (updateRes.ok) {
+        setUser(prev => prev ? { ...prev, avatar_url: url } : null);
+        alert('Profile picture updated!');
+      }
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      alert('Failed to update profile picture.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -134,12 +171,36 @@ export default function Dashboard() {
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full border border-zinc-900"></span>
               </button>
-              <div className="flex items-center gap-3 pl-4 border-l border-zinc-800 cursor-pointer hover:opacity-80 transition-opacity">
+              <div className="flex items-center gap-3 pl-4 border-l border-zinc-800">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-white">{user?.name || 'User'}</p>
                   <p className="text-xs text-zinc-500">Available for Work</p>
                 </div>
-                <UserCircle className="w-8 h-8 text-zinc-400" />
+                <div className="relative group">
+                  <label className="cursor-pointer">
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      disabled={isUploading}
+                    />
+                    {user?.avatar_url ? (
+                      <img 
+                        src={user.avatar_url} 
+                        alt="Profile" 
+                        className={`w-9 h-9 rounded-full object-cover border-2 border-zinc-800 group-hover:border-emerald-500 transition-all ${isUploading ? 'opacity-50' : ''}`}
+                      />
+                    ) : (
+                      <UserCircle className={`w-9 h-9 text-zinc-400 group-hover:text-white transition-colors ${isUploading ? 'animate-pulse text-emerald-500' : ''}`} />
+                    )}
+                    {isUploading && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+                      </div>
+                    )}
+                  </label>
+                </div>
               </div>
             </div>
           </div>
