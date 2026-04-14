@@ -72,7 +72,7 @@ export async function registerAction(prevState: any, formData: FormData) {
     return { error: error.message }
   }
 
-  const loginRedirect = role === 'employer' ? '/employer/login' : '/login'
+  const loginRedirect = '/login'
   
   revalidatePath('/', 'layout')
   redirect(`${loginRedirect}?message=Registration successful. Please log in.`)
